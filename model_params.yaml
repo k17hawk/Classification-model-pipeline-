@@ -1,6 +1,6 @@
 random_search:
   class: RandomizedSearchCV
-  module: sklear.model_selection
+  module: sklearn.model_selection  
   params:
     cv: 5
     n_iter: 10
@@ -12,12 +12,12 @@ model_selection:
     module: sklearn.linear_model
     params:
       fit_intercept: true
-      penality: l2
+      penalty: l2  
       max_iter: 50
-      search_param_grid:
-          fit_intercept:
-            -true
-            -flase
-          penality:
-            -l1
-            -l2
+      search_param_random:
+        fit_intercept:
+          - true  
+          - false  
+        penalty:
+          - l1
+          - l2
