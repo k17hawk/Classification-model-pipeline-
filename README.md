@@ -1,5 +1,5 @@
 # Classification-model-pipeline
-
+**test on python --version: 3.10**
 - 1. Imports
 Various libraries are imported like yaml, importlib, numpy, and sklearn.metrics.
 importlib allows for dynamic importing of modules based on strings (e.g., class or module names).
