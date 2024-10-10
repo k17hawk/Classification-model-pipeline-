@@ -13,83 +13,20 @@ from sklearn.metrics import precision_score, recall_score
 from config import MetricInfoArtifact,InitializeModelDetails,RandomSearchBestModel,BestModel
 from constant import *
 
-def evaluate_classification_model(model_list: list, X_train:np.ndarray, y_train:np.ndarray, X_test:np.ndarray, y_test:np.ndarray, base_accuracy:float=0.6)->MetricInfoArtifact:
-    """
-    Description:
-    This function compare multiple regression model return best model
-    Params:
-    model_list: List of model
-    X_train: Training dataset input feature
-    y_train: Training dataset target feature
-    X_test: Testing dataset input feature
-    y_test: Testing dataset input feature
-    return
-    It retured a frozen class 
-    MetricInfoArtifact
-    """
-    try:
-        
-    
-        index_number = 0
-        metric_info_artifact = None
-        for model in model_list:
-            model_name = str(model)  #getting model name based on model object
-            logging.info(f"{'>>'*30}Started evaluating model: [{type(model).__name__}] {'<<'*30}")
-            
-            #Getting prediction for training and testing dataset
-            y_train_pred = model.predict(X_train)
-            y_test_pred = model.predict(X_test)
-
-            test_acc = accuracy_score(y_test, y_test_pred)
-            train_acc = accuracy_score(y_train,y_train_pred)
-
-
-            #Calculating haarrmonic mean for train data
-            # precision_train = precision_score(y_train, y_train_pred)
-            # recall_train = recall_score(y_train, y_train_pred)
-            # f1_train = f1_score(y_train, y_train_pred)
-
-            #ncludes all the entries in a series using harmonic mean
-            # Calculating harmonic mean of train_accuracy and test_accuracy in order to test with base accuracy
-            model_accuracy = (2 * (train_acc * test_acc)) / (train_acc + test_acc)
-            diff_test_train_acc = abs(test_acc - train_acc)
-
-            #Calculating haarrmonic mean for test data
-            precision_test = precision_score(y_test, y_test_pred)
-            recall_test = recall_score(y_test, y_test_pred)
-
-            
-            #logging all important metric
-            logging.info(f"{'>>'*30} Score {'<<'*30}")
-            logging.info(f"Train Score\t\t Test Score\t\t Average Score")
-            logging.info(f"{train_acc}\t\t {test_acc}\t\t{model_accuracy}")
-
-            logging.info(f"{'>>'*30} Loss {'<<'*30}")
-            logging.info(f"Diff test train accuracy: [{diff_test_train_acc}].") 
-   
-
-
-            #if model accuracy is greater than base accuracy and train and test score is within certain thershold
-            #we will accept that model as accepted model
-            
-            if model_accuracy >= base_accuracy and diff_test_train_acc < 0.20:
-                base_accuracy = model_accuracy
-                metric_info_artifact = MetricInfoArtifact(model_name=model_name,
-                                                        model_object=model,
-                                                        test_precision=precision_test,
-                                                        test_recall = recall_test,
-                                                        train_accuracy=train_acc,
-                                                        test_accuracy=test_acc,
-                                                        model_accuracy=model_accuracy,
-                                                        index_number=index_number)
-
-                logging.info(f"Acceptable model found {metric_info_artifact}. ")
-            index_number += 1
-        if metric_info_artifact is None:
-            logging.info(f"No model found with higher accuracy than base accuracy")
-        return metric_info_artifact
-    except Exception as e:
-        raise e
+from cmath import log
+import importlib
+from pyexpat import model
+import numpy as np
+import yaml
+from scikit_credit_risk import logging
+import os
+import sys
+from collections import namedtuple
+from typing import List
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import precision_score, recall_score
+from scikit_credit_risk.entity.config import MetricInfoArtifact,InitializeModelDetails,RandomSearchBestModel,BestModel
+from scikit_credit_risk.entity.constant import *
 
 class ModelFinder:
     def __init__(self, model_config_path: str = None,):
@@ -134,7 +71,6 @@ class ModelFinder:
             #check first if property_data is type dict  {'fit_intercept' :'True'}
             if not isinstance(property_data, dict):
                 raise Exception("property_data parameter required to dictionary")
-            print(property_data)
             #iterate over property_data to get fit_intercept and True
             for key, value in property_data.items():
                 logging.info(f"Executing:$ {str(instance_ref)}.{key}={value}")
@@ -151,6 +87,7 @@ class ModelFinder:
                 print(A.b)  
                 '''
                 setattr(instance_ref, key, value)
+        
             return instance_ref
         except Exception as e:
             raise  e
@@ -189,6 +126,24 @@ class ModelFinder:
         return: Function will return RandomSearchOperation object
         """
         try:
+            if initialized_model.param_random_search is None:
+                logging.info(f"Random search parameters not provided for {initialized_model.model}. Skipping random search.")
+
+                initialized_model.model.fit(input_feature, output_feature)
+                if hasattr(initialized_model.model, 'score'):
+                    best_score = initialized_model.model.score(input_feature, output_feature)
+                else:
+                    best_score = None 
+                
+                # Directly return the model without random search
+                return RandomSearchBestModel(
+                    model_serial_number=initialized_model.model_serial_number,
+                    model=initialized_model.model,
+                    best_model=initialized_model.model,
+                    best_parameters=None,  # No best params since no random search was done
+                    best_score=best_score  # No best score since no random search was done
+                )
+        
             
            # initialized_model is the model that we have initalize
            # importing RandomSearchCV class and instantiating it
@@ -197,7 +152,7 @@ class ModelFinder:
                                                              )
 
             random_search_cv = random_search_cv_ref(estimator=initialized_model.model,
-                                                param_random=initialized_model.param_random_search)
+                                                param_distributions=initialized_model.param_random_search)
 
             #add the property to random_search_cv using setattr
             random_search_cv = ModelFinder.update_property_of_class(random_search_cv,
@@ -268,20 +223,26 @@ class ModelFinder:
 
                     #create dict from dict keys 
                     model_obj_property_data = dict(model_initialization_config[PARAM_KEY])
+                    print("model object property data",model_obj_property_data)
 
-                    #fit_intercept = True  should be done in linear regression to set it use update_property_of_class
+                    #fit_intercept = True  should be done in logistic regression to set it use update_property_of_class
                     model = ModelFinder.update_property_of_class(instance_ref=model,
                                                                   property_data=model_obj_property_data)
 
  
-                param_random_search = model_initialization_config[SEARCH_PARAM_RANDOM_KEY]
+                # param_random_search = model_initialization_config[SEARCH_PARAM_RANDOM_KEY]
+                
+                param_random_search = model_initialization_config.get(SEARCH_PARAM_RANDOM_KEY, None)
+                print("param_random_search",param_random_search)
 
-                #Access the model name using class: LinearRegression and  module: sklearn.linear_model
+
+
+                #Access the model name using class:LogisticRegression and  module: sklearn.linear_model
                 model_name = f"{model_initialization_config[MODULE_KEY]}.{model_initialization_config[CLASS_KEY]}"
 
                 #assign it to the namedtuple
                 model_initialization_config = InitializeModelDetails(model_serial_number=model_serial_number,
-                                                                      model=model,
+                                                                     model=model,
                                                                      param_random_search=param_random_search,
                                                                      model_name=model_name
                                                                      )
@@ -383,6 +344,7 @@ class ModelFinder:
             logging.info("Started Initializing model from config file")
             #get the list of self initalized model
             initialized_model_list = self.get_initialized_model_list()
+            print("loading initialized model",initialized_model_list)
             logging.info(f"Initialized model: {initialized_model_list}")
 
             #get the best model list applying the random search best model list which will take model list target feature and independent feature
@@ -398,5 +360,6 @@ class ModelFinder:
             raise e
         
     
+
 
 
