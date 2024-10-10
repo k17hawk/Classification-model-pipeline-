@@ -13,20 +13,6 @@ from sklearn.metrics import precision_score, recall_score
 from config import MetricInfoArtifact,InitializeModelDetails,RandomSearchBestModel,BestModel
 from constant import *
 
-from cmath import log
-import importlib
-from pyexpat import model
-import numpy as np
-import yaml
-from scikit_credit_risk import logging
-import os
-import sys
-from collections import namedtuple
-from typing import List
-from sklearn.metrics import accuracy_score
-from sklearn.metrics import precision_score, recall_score
-from scikit_credit_risk.entity.config import MetricInfoArtifact,InitializeModelDetails,RandomSearchBestModel,BestModel
-from scikit_credit_risk.entity.constant import *
 
 class ModelFinder:
     def __init__(self, model_config_path: str = None,):
